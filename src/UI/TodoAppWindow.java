@@ -1,12 +1,15 @@
 package UI;
 
-import components.Todo;
+import utils.CategoryTextField;
+import utils.GetComponents;
+import utils.Todo;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.sql.*;
+import java.util.HashSet;
 
 public class TodoAppWindow implements ActionListener {
     JFrame frame = new JFrame("Todo App");
@@ -16,10 +19,12 @@ public class TodoAppWindow implements ActionListener {
     JButton addTodoButton = new JButton("Add Todo");
     JScrollPane scrollPane = new JScrollPane(todoPanel);
     JTextField nameField = new JTextField();
-    JTextField categoryField = new JTextField();
+    CategoryTextField categoryField = new CategoryTextField();
     JLabel appLabel = new JLabel();
     JLabel nameInputLabel = new JLabel();
     JLabel categoryInputLabel = new JLabel();
+    JComboBox<String> categoryDropdown = new JComboBox<>();
+    HashSet<String> existingCategories = new HashSet<>();
 
     TodoAppWindow() {
         addTodoButton.setPreferredSize(new Dimension(100,25));
@@ -59,6 +64,11 @@ public class TodoAppWindow implements ActionListener {
         appLabel.setFont(new Font("Arial", Font.BOLD, 35));
         appLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        categoryDropdown.setFocusable(false);
+        categoryDropdown.setMaximumSize(new Dimension(200, 35));
+        categoryDropdown.addActionListener(this);
+        categoryDropdown.addItem("Show all");
+
         userPanel.setLayout(new BoxLayout(userPanel, BoxLayout.Y_AXIS));
         userPanel.setBackground(Color.decode("#4007d0"));
         userPanel.add(appLabel);
@@ -70,6 +80,8 @@ public class TodoAppWindow implements ActionListener {
         userPanel.add(categoryField);
         userPanel.add(Box.createVerticalStrut(10));
         userPanel.add(addTodoButton);
+        userPanel.add(Box.createVerticalStrut(10));
+        userPanel.add(categoryDropdown);
 
         todoPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         todoPanel.setBackground(Color.decode("#3c6bc3"));
@@ -78,7 +90,7 @@ public class TodoAppWindow implements ActionListener {
         splitPane.setDividerSize(0);
         splitPane.add(userPanel);
         splitPane.add(todoPanel);
-        splitPane.setResizeWeight(0.15);
+        splitPane.setResizeWeight(0.1);
 
         frame.add(splitPane);
 
@@ -115,19 +127,20 @@ public class TodoAppWindow implements ActionListener {
                 JPanel singleTodo = new JPanel();
                 singleTodo.setLayout(new FlowLayout(FlowLayout.LEFT));
                 JTextField name = new JTextField(nameField.getText());
-                JTextField category = new JTextField(categoryField.getText());
-                JButton removeTodo = new JButton("X");
+                CategoryTextField category = new CategoryTextField(categoryField.getText());
+                JButton removeTodoButton = new JButton("X");
 
-                removeTodo.addActionListener(e1 -> {
-                    if (e1.getSource() == removeTodo) {
+                removeTodoButton.addActionListener(e1 -> {
+                    if (e1.getSource() == removeTodoButton) {
                         todo.removeTodo(todoPanel, singleTodo);
                         deleteRowFromDatabase(name);
+                        categoryDropdown.remove(category);
                     }
                 });
 
                 JCheckBox finished = new JCheckBox();
 
-                todo.addTodo(todoPanel, singleTodo, name, category, removeTodo, finished);
+                todo.addTodo(todoPanel, singleTodo, name, category, removeTodoButton, finished);
 
                 finished.addActionListener(e2 -> {
                     if (e2.getSource() == finished) {
@@ -142,7 +155,12 @@ public class TodoAppWindow implements ActionListener {
                 nameField.setText("");
                 categoryField.setText("");
 
-                removeTodo.addActionListener(this);
+                removeTodoButton.addActionListener(this);
+
+                if (!existingCategories.contains(category.getText())) {
+                    existingCategories.add(category.getText());
+                    categoryDropdown.addItem(category.getText());
+                }
             }
 
             connection.close();
@@ -218,6 +236,23 @@ public class TodoAppWindow implements ActionListener {
         }
     }
 
+    public static void filterTodos(JPanel todoPanel, JComboBox<String> categoryDropdown) {
+        GetComponents getComponents = new GetComponents();
+        for (Component todo : todoPanel.getComponents()) {
+            todo.setVisible(true);
+            for (Component c : getComponents.getAllComponents((Container) todo)) {
+                if (c instanceof CategoryTextField) {
+                    if (!((CategoryTextField) c).getText().equals(categoryDropdown.getSelectedItem())) {
+                        todo.setVisible(false);
+                    }
+                    if (categoryDropdown.getSelectedItem().equals("Show all")) {
+                        todo.setVisible(true);
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == addTodoButton) {
@@ -226,26 +261,42 @@ public class TodoAppWindow implements ActionListener {
             JPanel singleTodo = new JPanel();
             singleTodo.setLayout(new FlowLayout(FlowLayout.LEFT));
             JTextField name = new JTextField(nameField.getText());
-            JTextField category = new JTextField(categoryField.getText());
-            JButton removeTodo = new JButton("X");
+            CategoryTextField category = new CategoryTextField(categoryField.getText());
+            JButton removeTodoButton = new JButton("X");
 
-            removeTodo.addActionListener(e1 -> {
-                if (e1.getSource() == removeTodo) {
+            removeTodoButton.addActionListener(e1 -> {
+                if (e1.getSource() == removeTodoButton) {
                     todo.removeTodo(todoPanel, singleTodo);
                     deleteRowFromDatabase(name);
+                    categoryDropdown.remove(category);
                 }
             });
 
             JCheckBox finished = new JCheckBox();
 
-            todo.addTodo(todoPanel, singleTodo, name, category, removeTodo, finished);
+            todo.addTodo(todoPanel, singleTodo, name, category, removeTodoButton, finished);
+
+            finished.addActionListener(e2 -> {
+                if (e2.getSource() == finished) {
+                    updateCheckbox(finished, name.getText());
+                }
+            });
 
             addRowToDatabase(name.getText(), category.getText(), finished.isSelected());
 
             nameField.setText("");
             categoryField.setText("");
 
-            removeTodo.addActionListener(this);
+            removeTodoButton.addActionListener(this);
+
+            if (!existingCategories.contains(category.getText())) {
+                existingCategories.add(category.getText());
+                categoryDropdown.addItem(category.getText());
+            }
+
+        }
+        if (e.getSource() == categoryDropdown) {
+            filterTodos(todoPanel, categoryDropdown);
         }
     }
 }
