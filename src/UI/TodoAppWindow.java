@@ -165,7 +165,7 @@ public class TodoAppWindow implements ActionListener {
 
             connection.close();
         } catch (Exception e) {
-            System.out.println(e);
+            System.out.println(e.getMessage());
         }
     }
 
